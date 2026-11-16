@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>교사 화면 · 수업 허브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{--ink:#0E2A3B;--sub:#33505F;--bg:#F2F6F8;--card:#FFFFFF;--line:#D5E0E6;--teal:#0A5F6B;--navy2:#17405A;--mist:#A9D6DC;--warn:#9A3F06;--warn-soft:#FDF1E8;--mono:'JetBrains Mono',Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Noto Sans KR','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+button{font-family:inherit}
+:focus-visible{outline:3px solid #E08A3C;outline-offset:2px}
+header{background:var(--ink);color:#fff;padding:16px 32px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.brand small{display:block;font-size:13px;color:var(--mist);letter-spacing:.04em}
+.brand strong{font-size:20px}
+.status{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.pill{background:var(--navy2);border-radius:10px;padding:8px 14px;min-width:120px}
+.pill small{display:block;font-size:12px;color:var(--mist)}
+.pill b{font-size:15px}
+.hbtn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--mist);background:transparent;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.wrap{max-width:1360px;margin:0 auto;padding:28px 32px 56px;display:flex;flex-direction:column;gap:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px}
+.card h2{margin:0;font-size:20px}
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:14px}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid transparent}
+.scroll{overflow-x:auto}
+table.grid{border-collapse:separate;border-spacing:4px;width:100%;min-width:900px;font-size:14px}
+table.grid th{padding:6px 8px;font-weight:700}
+table.grid thead th{font-family:var(--mono)}
+table.grid th[scope=row]{text-align:left;font-weight:500;white-space:nowrap}
+table.grid td{height:40px;border-radius:8px;text-align:center;font-size:13px;font-weight:700;border:1px solid #B9CAD3;background:#fff}
+table.grid td.d{background:var(--teal);border-color:var(--teal);color:#fff}
+table.grid td.h{background:#FBE3D2;border-color:var(--warn);color:#7A3105}
+.cols{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.cols>.card:first-child{flex:999 1 560px;min-width:0}
+.cols>aside{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:24px}
+table.board{border-collapse:collapse;width:100%;min-width:520px;font-size:15px}
+table.board th,table.board td{padding:12px 8px;border-bottom:1px solid var(--line);text-align:left}
+table.board thead th{border-bottom:2px solid var(--ink)}
+table.board .num{text-align:right;font-family:var(--mono)}
+.bar{display:flex;align-items:center;gap:10px}
+.track{flex:1 1 auto;height:12px;background:#E3ECF0;border-radius:6px;overflow:hidden}
+.fill{height:100%;background:var(--teal);border-radius:6px}
+.gain{font-weight:700;font-family:var(--mono);min-width:60px;text-align:right}
+.help{border:2px solid var(--warn)}
+.help h2{color:var(--warn);font-size:18px;margin-bottom:12px}
+.req{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--warn-soft);border-radius:10px;margin-bottom:10px}
+.req b{display:block;font-size:15px}
+.req span{font-size:13px;color:var(--sub)}
+.req button{min-height:44px;padding:0 14px;border-radius:8px;border:1px solid var(--warn);background:#fff;color:var(--warn);font-size:14px;font-weight:700;cursor:pointer}
+.muted{color:var(--sub);font-size:14px;margin:0}
+@media (max-width:600px){header{padding:16px}.wrap{padding:20px 16px 40px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><small>수업 허브 · 교사용</small><strong>진도와 챌린지 기록판</strong></div>
+  <div class="status">
+    <div class="pill"><small>마지막 갱신</small><b id="updated">-</b></div>
+    <button type="button" class="hbtn" id="refresh">지금 새로 고침</button>
+  </div>
+</header>
+<div class="wrap">
+  <section class="card">
+    <div class="head">
+      <h2>미션 진도</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:#0A5F6B"></i>완료</span>
+        <span><i class="sw" style="background:#FBE3D2;border-color:#9A3F06"></i>도움 요청</span>
+        <span><i class="sw" style="background:#fff;border-color:#B9CAD3"></i>아직</span>
+      </div>
+    </div>
+    <div class="scroll"><table class="grid" id="grid"></table></div>
+  </section>
+  <div class="cols">
+    <section class="card">
+      <div class="head"><div><h2>5교시 해양 정화 드론 기록판</h2><p class="muted">행동 1회당 수확량이 얼마나 좋아졌는지로 순위를 매깁니다.</p></div></div>
+      <div class="scroll"><table class="board"><thead><tr><th>순위</th><th>학생</th><th class="num">개선 전</th><th class="num">개선 후</th><th style="width:40%">개선율</th></tr></thead><tbody id="board"></tbody></table></div>
+    </section>
+    <aside>
+      <section class="card help"><h2 id="helpTitle">도움 요청</h2><div id="helps"></div></section>
+      <section class="card"><h2 style="font-size:18px;margin-bottom:8px">안내</h2><p class="muted">10초마다 자동으로 새로 고칩니다. 기록 원본은 Google 스프레드시트의 progress, help, challenge 시트에 쌓입니다.</p></section>
+    </aside>
+  </div>
+</div>
+<script>
+const API = "https://script.google.com/macros/s/AKfycbxaqHVYQG-3mlJDU1UUsJRtRRsQfLIe0YklKKGmwSysqdvZlUYOuuBMD9VZhJygAM4k/exec";
+const KEY = "daejeong1121";
+const STUDENTS = ["학생 1","학생 2","학생 3","학생 4","학생 5","학생 6","학생 7","학생 8"];
+const MISSION_IDS = ["1-1","1-2","1-3","2-1","2-2","3-1","3-2","4-1","4-2","5-1","6-1","6-2"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function ago(t){
+  const m = Math.floor((Date.now() - new Date(t).getTime()) / 60000);
+  return m < 1 ? "방금" : m + "분 전";
+}
+
+function draw(data){
+  // rows: [time, student, mission, value, extraJson]
+  const done = {}, help = {};
+  (data.progress || []).forEach(r => { done[r[1] + "|" + r[2]] = r[3] === "done"; });
+  (data.help || []).forEach(r => { help[r[1] + "|" + r[2]] = r[3] === "open" ? r[0] : null; });
+
+  let h = "<thead><tr><th>학생</th>" + MISSION_IDS.map(m => '<th scope="col">' + m + "</th>").join("") + "</tr></thead><tbody>";
+  STUDENTS.forEach(s => {
+    h += '<tr><th scope="row">' + s + "</th>" + MISSION_IDS.map(m => {
+      const k = s + "|" + m;
+      if (help[k]) return '<td class="h">도움</td>';
+      if (done[k]) return '<td class="d">완료</td>';
+      return "<td></td>";
+    }).join("") + "</tr>";
+  });
+  $("#grid").innerHTML = h + "</tbody>";
+
+  const open = Object.keys(help).filter(k => help[k]).map(k => ({k: k, s: k.split("|")[0], m: k.split("|")[1], t: help[k]}))
+    .sort((a, b) => new Date(a.t) - new Date(b.t));
+  $("#helpTitle").textContent = "도움 요청 " + open.length + "건";
+  $("#helps").innerHTML = open.length ? open.map(o =>
+    '<div class="req"><div><b>' + esc(o.s) + "</b><span>미션 " + esc(o.m) + " · " + ago(o.t) + '</span></div><button type="button" data-s="' + esc(o.s) + '" data-m="' + esc(o.m) + '">해결</button></div>').join("")
+    : '<p class="muted">지금은 도움 요청이 없습니다.</p>';
+
+  const last = {};
+  (data.challenge || []).forEach(r => { try { last[r[1]] = JSON.parse(r[4]); } catch(e){} });
+  const rows = Object.keys(last).map(s => {
+    const x = last[s], before = x.bg / x.ba, after = x.ag / x.aa;
+    return {s: s, before: before, after: after, gain: before > 0 ? (after - before) / before * 100 : null};
+  }).filter(r => isFinite(r.before) && isFinite(r.after))
+    .sort((a, b) => (b.gain === null ? -1e9 : b.gain) - (a.gain === null ? -1e9 : a.gain));
+  const max = Math.max(1, ...rows.map(r => r.gain || 0));
+  $("#board").innerHTML = rows.length ? rows.map((r, i) =>
+    "<tr><td><b>" + (i + 1) + "</b></td><td>" + esc(r.s) + '</td><td class="num">' + r.before.toFixed(2) + '</td><td class="num">' + r.after.toFixed(2) +
+    '</td><td><div class="bar"><div class="track" aria-hidden="true"><div class="fill" style="width:' + Math.max(0, Math.min(100, (r.gain || 0) / max * 100)) + '%"></div></div><span class="gain">' +
+    (r.gain === null ? "-" : (r.gain >= 0 ? "+" : "") + Math.round(r.gain) + "%") + "</span></div></td></tr>").join("")
+    : '<tr><td colspan="5" class="muted">아직 기록이 없습니다.</td></tr>';
+}
+
+function load(){
+  return fetch(API + "?key=" + encodeURIComponent(KEY) + "&t=" + Date.now())
+    .then(r => r.json()).then(j => {
+      if (!j.ok) throw new Error("rejected");
+      draw(j.data);
+      $("#updated").textContent = new Date().toLocaleTimeString("ko-KR", {hour12: false});
+    }).catch(() => { $("#updated").textContent = "불러오지 못함"; });
+}
+
+$("#helps").addEventListener("click", e => {
+  const b = e.target.closest("button[data-s]");
+  if (!b) return;
+  b.disabled = true;
+  fetch(API, {method: "POST", headers: {"Content-Type": "text/plain;charset=utf-8"},
+    body: JSON.stringify({key: KEY, type: "help", student: b.dataset.s, mission: b.dataset.m, value: "resolved"})})
+    .then(load, load);
+});
+$("#refresh").addEventListener("click", load);
+draw({});
+load(); setInterval(load, 10000);
+</script>
+</body>
+</html>
