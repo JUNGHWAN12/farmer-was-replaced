@@ -63,9 +63,12 @@ th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);verti
 .scroll{overflow-x:auto}
 .note{background:var(--teal-soft);border-radius:10px;padding:14px 16px;font-size:15px}
 footer{max-width:1360px;margin:0 auto;padding:0 32px 32px;color:var(--sub);font-size:13px}
-.who{display:flex;flex-direction:column;gap:2px}
+.who{display:flex;gap:8px;align-items:flex-end}
+.who>div{display:flex;flex-direction:column;gap:2px}
 .who label{font-size:12px;color:var(--mist)}
-.who input{min-height:44px;width:150px;border-radius:8px;border:1px solid #5E8CA0;background:#fff;color:var(--ink);font-size:15px;font-family:inherit;padding:0 12px}
+.who input[readonly]{background:#DCE6EB;color:var(--sub);cursor:default}
+.who button{min-height:44px;padding:0 14px;border-radius:8px;border:1px solid var(--mist);background:transparent;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.who input{min-height:44px;width:120px;border-radius:8px;border:1px solid #5E8CA0;background:#fff;color:var(--ink);font-size:15px;font-family:inherit;padding:0 12px}
 .btn.warn{border-color:var(--warn);color:var(--warn)}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
 .form label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:500}
@@ -81,7 +84,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 32px 32px;color:var(--sub);font-
   <div class="status" aria-live="polite">
     <div class="pill"><small id="nowLabel">지금</small><b id="nowText">-</b></div>
     <div class="pill"><small id="leftLabel">남은 시간</small><b class="mono" id="leftText">--:--</b></div>
-    <div class="who"><label for="who">내 이름</label><input id="who" type="text" placeholder="이름을 입력하세요" maxlength="20" autocomplete="off"></div>
+    <div class="who"><div><label for="sid">학번</label><input id="sid" type="text" inputmode="numeric" placeholder="예: 10305" maxlength="10" autocomplete="off" style="width:96px"></div><div><label for="who">이름</label><input id="who" type="text" placeholder="이름" maxlength="20" autocomplete="off"></div><button type="button" id="whoBtn">저장</button></div>
   </div>
 </header>
 <nav aria-label="교시 이동" id="tabs"></nav>
@@ -90,7 +93,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 32px 32px;color:var(--sub);font-
   <aside id="side"></aside>
 </div>
 <div id="toast" role="status" hidden></div>
-<footer>체크 표시는 이 컴퓨터에 저장되고, 미션 완료·도움 요청·챌린지 기록은 선생님 화면으로 전송됩니다. 게임: The Farmer Was Replaced</footer>
+<footer>체크 표시는 이 컴퓨터에 저장되고, 미션 완료·도움 요청·챌린지 기록은 선생님 화면으로 전송됩니다. 다른 컴퓨터에서도 같은 학번·이름을 넣으면 미션 완료 기록을 불러옵니다. 게임: The Farmer Was Replaced</footer>
 
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxaqHVYQG-3mlJDU1UUsJRtRRsQfLIe0YklKKGmwSysqdvZlUYOuuBMD9VZhJygAM4k/exec";
@@ -131,7 +134,7 @@ const PERIODS = [
   unlocks:["Expand 4 · 나무 100, 당근 50 (선택)"], missions:["5-1"],
   ocean:{t:"정화 드론의 배터리", b:"바다 위 드론은 배터리가 한정되어 있습니다. 쓸데없는 움직임을 줄여야 더 넓은 구역을 청소할 수 있습니다. 게임에서는 '행동 횟수'가 배터리입니다.", q:"어떤 행동이 꼭 필요하고, 어떤 행동이 낭비일까요?"},
   cmds:[["num_items(Items.Carrot)","가진 당근 수"],["actions += 1","변수에 1 더하기"],["행동 = 200틱","이동, 심기, 수확, 땅 갈기, 물 주기"],["확인 = 1틱","can_harvest(), get_water() 등"]],
-  extra:'<section class="card"><h2>챌린지 기록 보내기</h2><form id="chForm"><div class="form"><label>개선 전 수확<input type="number" min="0" step="1" name="bg" required></label><label>개선 전 행동<input type="number" min="1" step="1" name="ba" required></label><label>개선 후 수확<input type="number" min="0" step="1" name="ag" required></label><label>개선 후 행동<input type="number" min="1" step="1" name="aa" required></label></div><div class="row"><button type="submit" class="btn primary">기록 보내기</button></div></form><p class="note" style="margin:14px 0 0">실행 결과에 나온 수확과 행동 숫자를 그대로 적으세요. 한 번에 한 가지만 바꾸고 2~3번 측정해 비교합니다. 다시 보내면 마지막 기록이 기록판에 올라갑니다.</p></section>'},
+  extra:'<section class="card"><h2>챌린지 기록 보내기</h2><form id="chForm" novalidate><div class="form"><label>개선 전 수확<input type="number" min="0" step="1" name="bg" required></label><label>개선 전 행동<input type="number" min="1" step="1" name="ba" required></label><label>개선 후 수확<input type="number" min="0" step="1" name="ag" required></label><label>개선 후 행동<input type="number" min="1" step="1" name="aa" required></label></div><div class="row"><button type="submit" class="btn primary">기록 보내기</button></div></form><p class="note" style="margin:14px 0 0">실행 결과에 나온 수확과 행동 숫자를 그대로 적으세요. 한 번에 한 가지만 바꾸고 2~3번 측정해 비교합니다. 다시 보내면 마지막 기록이 기록판에 올라갑니다.</p></section>'},
  {id:"p6", tab:"6교시", date:"2026-11-21", start:"15:00", end:"15:50",
   title:"코드 리뷰 및 개선", goal:"짝의 코드를 읽고 피드백하며, 함수로 코드를 읽기 쉽게 정리한다.",
   unlocks:["Functions · 당근 40"], missions:["6-1","6-2"],
@@ -169,18 +172,77 @@ function toast(msg){
   const t = $("#toast"); t.textContent = msg; t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
 }
-function who(){ return store.get("who") || ""; }
+// 선생님 화면에는 "학번 이름"(예: 10305 홍길동)으로 기록됩니다
+function who(){
+  const sid = store.get("sid") || "", name = store.get("name") || "";
+  return sid && name ? sid + " " + name : "";
+}
 function send(type, mission, value, extra, okMsg){
-  if (!who()){ toast("먼저 위에 내 이름을 입력하세요"); $("#who").focus(); return Promise.resolve(false); }
+  if (!who()){ toast("먼저 위에 학번과 이름을 입력하세요"); (store.get("sid") ? $("#who") : $("#sid")).focus(); return Promise.resolve(false); }
+  const item = {type: type, student: who(), mission: mission, value: value, extra: extra || {}};
+  // 앞서 못 보낸 기록이 있으면 순서가 섞이지 않게 뒤에 줄 세워 보냅니다
+  if ((store.get("outbox") || []).length){
+    queue(item); flush();
+    toast("인터넷 연결을 기다리는 중이에요. 연결되면 자동으로 보낼게요");
+    return Promise.resolve(false);
+  }
+  return post(item).then(() => {
+    if (okMsg) toast(okMsg);
+    return true;
+  }).catch(err => {
+    if (err.message === "rejected"){ toast("기록이 거절되었어요. 선생님께 알려 주세요"); return false; }
+    queue(item);
+    toast("인터넷이 잠시 끊겼어요. 기록을 보관했다가 연결되면 자동으로 보낼게요");
+    return false;
+  });
+}
+function post(item){
   return fetch(API, {
     method: "POST",
     headers: {"Content-Type": "text/plain;charset=utf-8"},
-    body: JSON.stringify({key: KEY, type: type, student: who(), mission: mission, value: value, extra: extra || {}})
-  }).then(r => r.json()).then(j => {
-    if (!j.ok) throw new Error("rejected");
-    if (okMsg) toast(okMsg);
-    return true;
-  }).catch(() => { toast("전송하지 못했어요. 인터넷 연결을 확인하고 선생님께 알려 주세요"); return false; });
+    body: JSON.stringify(Object.assign({key: KEY}, item))
+  }).then(r => r.json()).then(j => { if (!j.ok) throw new Error("rejected"); });
+}
+
+// 전송 실패 기록 보관함: 이 컴퓨터에 저장해 두고, 연결되면 순서대로 다시 보냅니다
+function queue(item){
+  const q = store.get("outbox") || [];
+  q.push(item);
+  store.set("outbox", q);
+}
+let flushing = false;
+function flush(){
+  if (flushing || !(store.get("outbox") || []).length) return;
+  flushing = true;
+  const next = () => {
+    const q = store.get("outbox") || [];
+    if (!q.length){ flushing = false; toast("보관해 둔 기록을 모두 보냈어요"); return; }
+    return post(q[0]).catch(err => { if (err.message !== "rejected") throw err; })   // 거절된 기록은 버림
+      .then(() => { store.set("outbox", (store.get("outbox") || []).slice(1)); return next(); });
+  };
+  next().catch(() => { flushing = false; });
+}
+
+// 진행 상황 복원: 선생님 화면(서버)에 저장된 내 미션 완료 기록을 불러옵니다
+function restore(){
+  const me = who();
+  if (!me) return Promise.resolve();
+  return fetch(API + "?key=" + encodeURIComponent(KEY) + "&t=" + Date.now()).then(r => r.json()).then(j => {
+    if (!j.ok || who() !== me) return;
+    const server = {};
+    ((j.data && j.data.progress) || []).forEach(r => { if (String(r[1]) === me) server[r[2]] = r[3] === "done"; });
+    (store.get("outbox") || []).forEach(it => { if (it.type === "progress" && it.student === me) server[it.mission] = it.value === "done"; });
+    let changed = 0;
+    Object.keys(MISSIONS).forEach(m => {
+      const local = !!store.get("done:" + m);
+      if (m in server){
+        if (server[m] !== local){ store.set("done:" + m, server[m]); changed++; }
+      } else if (local){
+        send("progress", m, "done");   // 이름을 넣기 전에 완료한 미션은 서버에 올림
+      }
+    });
+    if (changed){ render(); toast("저장된 진행 기록을 불러왔어요"); }
+  }).catch(() => {});
 }
 
 function at(date, hm){ return new Date(date + "T" + hm + ":00+09:00").getTime(); }
@@ -327,23 +389,52 @@ $("#main").addEventListener("click", e => {
   }
 });
 
-const whoInput = $("#who");
-whoInput.value = who();
-whoInput.addEventListener("keydown", e => { if (e.key === "Enter") whoInput.blur(); });
-whoInput.addEventListener("change", () => {
-  const name = whoInput.value.replace(/\s+/g, " ").trim();
-  whoInput.value = name;
-  if (name === who()) return;
-  store.set("who", name);
-  if (!name) return;
-  toast(name + " 이름으로 저장했어요");
-  // 이름을 입력하기 전에 완료한 미션도 선생님 화면에 반영
-  Object.keys(MISSIONS).filter(m => store.get("done:" + m)).forEach(m => send("progress", m, "done"));
+const sidInput = $("#sid"), nameInput = $("#who"), whoBtn = $("#whoBtn");
+sidInput.value = store.get("sid") || "";
+nameInput.value = store.get("name") || "";
+// 학번·이름 잠금: 저장하면 고정되고, '변경'을 눌러야 고칠 수 있습니다
+function lockWho(locked){
+  sidInput.readOnly = nameInput.readOnly = locked;
+  whoBtn.textContent = locked ? "변경" : "저장";
+}
+function saveWho(){
+  // 학번은 숫자만, 이름은 공백 없이 저장해 같은 학생이 둘로 나뉘지 않게 합니다
+  const sid = sidInput.value.replace(/\D/g, ""), name = nameInput.value.replace(/\s/g, "");
+  sidInput.value = sid; nameInput.value = name;
+  if (!sid){ toast("학번을 숫자로 입력하세요"); sidInput.focus(); return; }
+  if (!name){ toast("이름을 입력하세요"); nameInput.focus(); return; }
+  const before = who();
+  store.set("sid", sid); store.set("name", name);
+  lockWho(true);
+  const now = who();
+  if (now === before) return;
+  if (before){
+    // 다른 학생으로 바뀌면 이전 학생의 미션 완료 표시를 지우고 새 학생 기록을 불러옴
+    Object.keys(MISSIONS).forEach(m => store.set("done:" + m, false));
+    render();
+  }
+  toast(now + " (으)로 저장했어요");
+  restore();
+}
+whoBtn.addEventListener("click", () => {
+  if (!sidInput.readOnly){ saveWho(); return; }
+  if (!confirm("학번·이름을 바꾸면 선생님 화면에 다른 학생으로 기록됩니다. 바꿀까요?")) return;
+  lockWho(false);
+  sidInput.focus(); sidInput.select();
 });
+sidInput.addEventListener("keydown", e => { if (e.key === "Enter" && !sidInput.readOnly) nameInput.focus(); });
+nameInput.addEventListener("keydown", e => { if (e.key === "Enter" && !nameInput.readOnly) saveWho(); });
 $("#main").addEventListener("submit", e => {
   if (e.target.id !== "chForm") return;
   e.preventDefault();
   const f = new FormData(e.target), v = k => Number(f.get(k));
+  const LABEL = {bg: "개선 전 수확", ba: "개선 전 행동", ag: "개선 후 수확", aa: "개선 후 행동"};
+  for (const k of ["bg", "ba", "ag", "aa"]){
+    const raw = String(f.get(k) || "").trim(), n = Number(raw), bad = msg => { toast(msg); e.target.elements[k].focus(); };
+    if (raw === "") return bad(LABEL[k] + " 칸을 채워 주세요");
+    if (!Number.isInteger(n) || n < 0) return bad(LABEL[k] + "은 0 이상의 정수로 적어 주세요");
+    if ((k === "ba" || k === "aa") && n < 1) return bad("행동 수는 1 이상이어야 해요");
+  }
   send("challenge", "5-1", "record", {bg: v("bg"), ba: v("ba"), ag: v("ag"), aa: v("aa")}, "기록을 보냈어요");
 });
 
@@ -351,6 +442,10 @@ const live = livePeriod(Date.now());
 const saved = store.get("tab");
 go(live ? live.id : (PERIODS.some(p => p.id === saved) ? saved : "p1"));
 tick(); setInterval(tick, 1000);
+lockWho(!!who());
+restore();
+flush(); setInterval(flush, 10000);
+window.addEventListener("online", flush);
 </script>
 </body>
 </html>

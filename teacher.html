@@ -54,6 +54,12 @@ table.board .num{text-align:right;font-family:var(--mono)}
 .req span{font-size:13px;color:var(--sub)}
 .req button{min-height:44px;padding:0 14px;border-radius:8px;border:1px solid var(--warn);background:#fff;color:var(--warn);font-size:14px;font-weight:700;cursor:pointer}
 .muted{color:var(--sub);font-size:14px;margin:0}
+table.grid td.last{background:transparent;border:0;font-weight:500;color:var(--sub);white-space:nowrap}
+table.grid td.last.idle{color:var(--warn);font-weight:700}
+table.grid tr.hidden th,table.grid tr.hidden td{opacity:.45}
+.mini{min-height:32px;margin-left:8px;padding:0 10px;border-radius:6px;border:1px solid #8FA7B3;background:#fff;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer}
+.hiddenbar{display:flex;align-items:center;gap:8px;margin-top:12px}
+.hiddenbar[hidden]{display:none}
 @media (max-width:600px){header{padding:16px}.wrap{padding:20px 16px 40px}}
 </style>
 </head>
@@ -76,6 +82,7 @@ table.board .num{text-align:right;font-family:var(--mono)}
       </div>
     </div>
     <div class="scroll"><table class="grid" id="grid"></table></div>
+    <div class="hiddenbar" id="hiddenBar" hidden><span class="muted" id="hiddenText"></span><button type="button" class="mini" id="hiddenToggle"></button></div>
   </section>
   <div class="cols">
     <section class="card">
@@ -84,7 +91,7 @@ table.board .num{text-align:right;font-family:var(--mono)}
     </section>
     <aside>
       <section class="card help"><h2 id="helpTitle">도움 요청</h2><div id="helps"></div></section>
-      <section class="card"><h2 style="font-size:18px;margin-bottom:8px">안내</h2><p class="muted">10초마다 자동으로 새로 고칩니다. 기록 원본은 Google 스프레드시트의 progress, help, challenge 시트에 쌓입니다.</p></section>
+      <section class="card"><h2 style="font-size:18px;margin-bottom:8px">안내</h2><p class="muted">1초마다 자동으로 새로 고칩니다. 표의 “숨기기”는 이 컴퓨터에서만 적용되고 기록은 지우지 않습니다. 기록 원본은 Google 스프레드시트의 progress, help, challenge 시트에 쌓입니다.</p></section>
     </aside>
   </div>
 </div>
@@ -97,24 +104,47 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":
 
 function ago(t){
   const m = Math.floor((Date.now() - new Date(t).getTime()) / 60000);
-  return m < 1 ? "방금" : m + "분 전";
+  if (!isFinite(m)) return "-";
+  if (m < 1) return "방금";
+  if (m < 60) return m + "분 전";
+  return Math.floor(m / 60) + "시간 전";
 }
+const IDLE_MIN = 10;   // 이 시간(분) 넘게 기록이 없으면 주황색으로 표시
+
+// 숨긴 학생 목록 (이 컴퓨터에만 저장, 원본 기록은 그대로)
+const hidden = new Set((() => { try { return JSON.parse(localStorage.getItem("teacher:hidden")) || []; } catch(e){ return []; } })());
+function saveHidden(){ try { localStorage.setItem("teacher:hidden", JSON.stringify([...hidden])); } catch(e){} }
+let showHidden = false, lastData = {};
 
 function draw(data){
+  lastData = data;
   // rows: [time, student, mission, value, extraJson]
   const done = {}, help = {};
   (data.progress || []).forEach(r => { done[r[1] + "|" + r[2]] = r[3] === "done"; });
   (data.help || []).forEach(r => { help[r[1] + "|" + r[2]] = r[3] === "open" ? r[0] : null; });
 
-  // 학생이 직접 입력한 이름을 기록에서 모아 가나다순으로 표시
-  const names = new Set();
-  ["progress", "help", "challenge"].forEach(t => (data[t] || []).forEach(r => { if (r[1]) names.add(String(r[1])); }));
-  const students = [...names].sort((a, b) => a.localeCompare(b, "ko"));
+  // 학생이 입력한 "학번 이름"을 기록에서 모아 학번 순으로 표시
+  const lastAt = {};
+  ["progress", "help", "challenge"].forEach(t => (data[t] || []).forEach(r => {
+    if (!r[1]) return;
+    const s = String(r[1]), ts = new Date(r[0]).getTime();
+    if (!(s in lastAt) || ts > lastAt[s]) lastAt[s] = ts;
+  }));
+  const all = Object.keys(lastAt).sort((a, b) => a.localeCompare(b, "ko", {numeric: true}));
+  const nHidden = all.filter(s => hidden.has(s)).length;
+  const students = all.filter(s => showHidden || !hidden.has(s));
 
-  let h = "<thead><tr><th>학생</th>" + MISSION_IDS.map(m => '<th scope="col">' + m + "</th>").join("") + "</tr></thead><tbody>";
-  if (!students.length) h += '<tr><td colspan="' + (MISSION_IDS.length + 1) + '" class="muted">아직 접속한 학생이 없습니다.</td></tr>';
+  $("#hiddenBar").hidden = !nHidden;
+  $("#hiddenText").textContent = "숨긴 학생 " + nHidden + "명";
+  $("#hiddenToggle").textContent = showHidden ? "숨긴 학생 감추기" : "숨긴 학생 보기";
+
+  let h = '<thead><tr><th>학생</th><th scope="col">마지막 기록</th>' + MISSION_IDS.map(m => '<th scope="col">' + m + "</th>").join("") + "</tr></thead><tbody>";
+  if (!students.length) h += '<tr><td colspan="' + (MISSION_IDS.length + 2) + '" class="muted">아직 접속한 학생이 없습니다.</td></tr>';
   students.forEach(s => {
-    h += '<tr><th scope="row">' + esc(s) + "</th>" + MISSION_IDS.map(m => {
+    const isHidden = hidden.has(s), idle = Date.now() - lastAt[s] >= IDLE_MIN * 60000;
+    h += "<tr" + (isHidden ? ' class="hidden"' : "") + '><th scope="row">' + esc(s) +
+      '<button type="button" class="mini" data-hide="' + esc(s) + '">' + (isHidden ? "보이기" : "숨기기") + "</button></th>" +
+      '<td class="last' + (idle ? " idle" : "") + '">' + ago(lastAt[s]) + "</td>" + MISSION_IDS.map(m => {
       const k = s + "|" + m;
       if (help[k]) return '<td class="h">도움</td>';
       if (done[k]) return '<td class="d">완료</td>';
@@ -132,7 +162,7 @@ function draw(data){
 
   const last = {};
   (data.challenge || []).forEach(r => { try { last[r[1]] = JSON.parse(r[4]); } catch(e){} });
-  const rows = Object.keys(last).map(s => {
+  const rows = Object.keys(last).filter(s => !hidden.has(s)).map(s => {
     const x = last[s], before = x.bg / x.ba, after = x.ag / x.aa;
     return {s: s, before: before, after: after, gain: before > 0 ? (after - before) / before * 100 : null};
   }).filter(r => isFinite(r.before) && isFinite(r.after))
@@ -145,14 +175,28 @@ function draw(data){
     : '<tr><td colspan="5" class="muted">아직 기록이 없습니다.</td></tr>';
 }
 
+let loading = false, lastKey = "";
 function load(){
+  if (loading) return Promise.resolve();   // 앞 요청이 끝나기 전에는 새로 보내지 않음
+  loading = true;
   return fetch(API + "?key=" + encodeURIComponent(KEY) + "&t=" + Date.now())
     .then(r => r.json()).then(j => {
       if (!j.ok) throw new Error("rejected");
-      draw(j.data);
+      // 기록이 바뀌었거나 1분이 지났을 때만 다시 그려 버튼 클릭이 끊기지 않게 함
+      const key = JSON.stringify(j.data) + "|" + Math.floor(Date.now() / 60000);
+      if (key !== lastKey){ lastKey = key; draw(j.data); }
       $("#updated").textContent = new Date().toLocaleTimeString("ko-KR", {hour12: false});
-    }).catch(() => { $("#updated").textContent = "불러오지 못함"; });
+    }).catch(() => { $("#updated").textContent = "불러오지 못함"; })
+    .then(() => { loading = false; });
 }
+$("#grid").addEventListener("click", e => {
+  const b = e.target.closest("button[data-hide]");
+  if (!b) return;
+  const s = b.dataset.hide;
+  if (hidden.has(s)) hidden.delete(s); else hidden.add(s);
+  saveHidden(); draw(lastData);
+});
+$("#hiddenToggle").addEventListener("click", () => { showHidden = !showHidden; draw(lastData); });
 
 $("#helps").addEventListener("click", e => {
   const b = e.target.closest("button[data-s]");
@@ -162,9 +206,9 @@ $("#helps").addEventListener("click", e => {
     body: JSON.stringify({key: KEY, type: "help", student: b.dataset.s, mission: b.dataset.m, value: "resolved"})})
     .then(load, load);
 });
-$("#refresh").addEventListener("click", load);
+$("#refresh").addEventListener("click", () => { lastKey = ""; load(); });
 draw({});
-load(); setInterval(load, 10000);
+load(); setInterval(load, 1000);
 </script>
 </body>
 </html>
