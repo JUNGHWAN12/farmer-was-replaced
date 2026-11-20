@@ -60,6 +60,17 @@ table.grid tr.hidden th,table.grid tr.hidden td{opacity:.45}
 .mini{min-height:32px;margin-left:8px;padding:0 10px;border-radius:6px;border:1px solid #8FA7B3;background:#fff;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer}
 .hiddenbar{display:flex;align-items:center;gap:8px;margin-top:12px}
 .hiddenbar[hidden]{display:none}
+.shares{display:flex;flex-direction:column;gap:12px}
+.share{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.share.off{opacity:.5}
+.share .shead{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.share .tag{font-family:var(--mono);font-size:13px;font-weight:700;background:#E3ECF0;border-radius:6px;padding:2px 8px}
+.share .note{flex:1 1 200px;color:var(--ink)}
+.share small{color:var(--sub);font-size:13px}
+.share summary{cursor:pointer;font-size:14px;color:var(--teal);font-weight:700;margin-top:8px;min-height:32px;display:flex;align-items:center}
+.share pre{margin:8px 0 0;background:var(--ink);color:#E6F1F4;border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow:auto;max-height:320px;tab-size:4}
+.share .mini.warn{border-color:var(--warn);color:var(--warn)}
+select.mini{min-height:36px}
 @media (max-width:600px){header{padding:16px}.wrap{padding:20px 16px 40px}}
 </style>
 </head>
@@ -94,6 +105,11 @@ table.grid tr.hidden th,table.grid tr.hidden td{opacity:.45}
       <section class="card"><h2 style="font-size:18px;margin-bottom:8px">안내</h2><p class="muted">1초마다 자동으로 새로 고칩니다. 표의 “숨기기”는 이 컴퓨터에서만 적용되고 기록은 지우지 않습니다. 기록 원본은 Google 스프레드시트의 progress, help, challenge 시트에 쌓입니다.</p></section>
     </aside>
   </div>
+  <section class="card">
+    <div class="head"><div><h2>공유된 코드</h2><p class="muted">학생들이 공유한 코드입니다. '내리기'를 누르면 학생 화면에서 사라집니다. 5초마다 새로 고칩니다.</p></div>
+      <label class="muted">미션 <select class="mini" id="shareFilter"><option value="">전체</option></select></label></div>
+    <div class="shares" id="shares"><p class="muted">불러오는 중...</p></div>
+  </section>
 </div>
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxaqHVYQG-3mlJDU1UUsJRtRRsQfLIe0YklKKGmwSysqdvZlUYOuuBMD9VZhJygAM4k/exec";
@@ -206,9 +222,65 @@ $("#helps").addEventListener("click", e => {
     body: JSON.stringify({key: KEY, type: "help", student: b.dataset.s, mission: b.dataset.m, value: "resolved"})})
     .then(load, load);
 });
-$("#refresh").addEventListener("click", () => { lastKey = ""; load(); });
+$("#refresh").addEventListener("click", () => { lastKey = ""; load(); loadShares(); });
+
+// ===== 공유된 코드 관리 =====
+// share 시트 한 줄: [시간, 학생, 미션, "post"|"hide"|"show", {id, note, code}]
+let shareRows = [], shareKey = "", shareLoading = false;
+const openCode = new Set();   // 펼쳐 둔 코드 (다시 그려도 유지)
+function parseShares(rows){
+  const map = {}, order = [];
+  (rows || []).forEach(r => {
+    let x; try { x = JSON.parse(r[4]); } catch(e){ return; }
+    if (!x || !x.id) return;
+    if (r[3] === "post"){
+      if (!map[x.id]) order.push(x.id);
+      map[x.id] = {id: x.id, t: r[0], student: String(r[1]), mission: String(r[2]), note: String(x.note || ""), code: String(x.code || ""), hidden: false};
+    } else if (map[x.id] && (r[3] === "hide" || r[3] === "show")){
+      map[x.id].hidden = r[3] === "hide";
+    }
+  });
+  return order.map(id => map[id]).reverse();
+}
+function drawShares(){
+  const f = $("#shareFilter").value, list = shareRows.filter(x => !f || x.mission === f);
+  $("#shares").innerHTML = list.length ? list.map(x =>
+    '<article class="share' + (x.hidden ? " off" : "") + '"><div class="shead"><span class="tag">' + esc(x.mission) + "</span><b>" + esc(x.student) + "</b>" +
+    '<span class="note">' + esc(x.note) + "</span><small>" + ago(x.t) + (x.hidden ? " · 내림" : "") + "</small>" +
+    '<button type="button" class="mini' + (x.hidden ? "" : " warn") + '" data-share="' + esc(x.id) + '">' + (x.hidden ? "다시 올리기" : "내리기") + "</button></div>" +
+    '<details data-id="' + esc(x.id) + '"' + (openCode.has(x.id) ? " open" : "") + "><summary>코드 보기 (" + x.code.split("\n").length + "줄)</summary><pre><code>" + esc(x.code) + "</code></pre></details></article>").join("")
+    : '<p class="muted">아직 공유된 코드가 없습니다.</p>';
+}
+function loadShares(){
+  if (shareLoading) return;
+  shareLoading = true;
+  fetch(API + "?key=" + encodeURIComponent(KEY) + "&tabs=share&t=" + Date.now()).then(r => r.json()).then(j => {
+    if (!j.ok) throw new Error("rejected");
+    const key = JSON.stringify(j.data.share || []) + "|" + Math.floor(Date.now() / 60000);
+    if (key === shareKey) return;
+    shareKey = key; shareRows = parseShares(j.data.share);
+    drawShares();
+  }).catch(() => {}).then(() => { shareLoading = false; });
+}
+$("#shareFilter").innerHTML += MISSION_IDS.concat(["7-1", "7-2", "7-3", "7-4"]).map(m => "<option>" + m + "</option>").join("");
+$("#shareFilter").addEventListener("change", drawShares);
+$("#shares").addEventListener("toggle", e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (id){ if (e.target.open) openCode.add(id); else openCode.delete(id); }
+}, true);
+$("#shares").addEventListener("click", e => {
+  const b = e.target.closest("button[data-share]");
+  if (!b) return;
+  const x = shareRows.find(y => y.id === b.dataset.share);
+  if (!x) return;
+  b.disabled = true;
+  fetch(API, {method: "POST", headers: {"Content-Type": "text/plain;charset=utf-8"},
+    body: JSON.stringify({key: KEY, type: "share", student: "선생님", mission: x.mission, value: x.hidden ? "show" : "hide", extra: {id: x.id}})})
+    .then(() => { x.hidden = !x.hidden; drawShares(); }, () => { b.disabled = false; });
+});
 draw({});
 load(); setInterval(load, 1000);
+loadShares(); setInterval(loadShares, 5000);
 </script>
 </body>
 </html>

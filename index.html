@@ -47,6 +47,21 @@ h1{margin:4px 0 8px;font-size:28px;line-height:1.3}
 .mbody p{margin:0;color:var(--sub);font-size:15px}
 pre{margin:0;background:var(--ink);color:#E6F1F4;border-radius:10px;padding:18px 20px;font-family:var(--mono);font-size:14px;line-height:1.65;overflow-x:auto;tab-size:4}
 .row{display:flex;flex-wrap:wrap;gap:12px}
+.sharebox{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:12px}
+.sharebox h3{margin:0;font-size:16px}
+.btn.on{background:var(--teal-soft)}
+.shareform{display:flex;flex-direction:column;gap:10px}
+.shareform label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:500}
+.shareform input,.shareform textarea{border:1px solid #8FA7B3;border-radius:8px;padding:10px 12px;font-size:15px;font-family:inherit;color:var(--ink)}
+.shareform input{min-height:44px}
+.shareform textarea{font-family:var(--mono);font-size:14px;line-height:1.5;resize:vertical;tab-size:4}
+.shares{display:flex;flex-direction:column;gap:12px}
+.shares .bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;font-size:14px;color:var(--sub)}
+.share{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.share .shead{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.share .shead span{color:var(--ink);font-size:15px}
+.share .shead small{color:var(--sub);font-size:13px}
+.share pre{max-height:260px;overflow:auto;font-size:13px;padding:12px 14px}
 .btn{min-height:48px;padding:0 20px;border-radius:10px;border:1px solid var(--teal);background:#fff;color:var(--teal);font-size:15px;font-weight:700;cursor:pointer}
 .btn.primary{background:var(--teal);color:#fff}
 .ocean{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -167,6 +182,80 @@ const store = {
 };
 let current = null, openMission = null;
 
+// ===== 코드 공유 =====
+// 서버 'share' 시트 한 줄: [시간, 학생, 미션, "post"|"hide"|"show", {id, note, code}]
+const SHARE_MAX = 10000;   // 공유 코드 최대 글자 수
+let panel = null;          // 열린 공유 칸: {m: 미션, mode: "form" | "list"}
+const drafts = {};         // 미션별 작성 중인 공유 글 (화면을 다시 그려도 유지)
+let shares = null, sharesState = "idle";   // idle | loading | error
+function ago(t){
+  const m = Math.floor((Date.now() - new Date(t).getTime()) / 60000);
+  if (!isFinite(m)) return "";
+  if (m < 1) return "방금";
+  if (m < 60) return m + "분 전";
+  return Math.floor(m / 60) + "시간 전";
+}
+function parseShares(rows){
+  const map = {}, order = [];
+  (rows || []).forEach(r => {
+    let x; try { x = JSON.parse(r[4]); } catch(e){ return; }
+    if (!x || !x.id) return;
+    if (r[3] === "post"){
+      if (!map[x.id]) order.push(x.id);
+      map[x.id] = {id: x.id, t: r[0], student: String(r[1]), mission: String(r[2]), note: String(x.note || ""), code: String(x.code || ""), hidden: false};
+    } else if (map[x.id] && (r[3] === "hide" || r[3] === "show")){
+      map[x.id].hidden = r[3] === "hide";
+    }
+  });
+  return order.map(id => map[id]).reverse();   // 최신 순
+}
+function loadShares(){
+  sharesState = "loading"; render();
+  return fetch(API + "?key=" + encodeURIComponent(KEY) + "&tabs=share&t=" + Date.now()).then(r => r.json()).then(j => {
+    if (!j.ok) throw new Error("rejected");
+    shares = parseShares(j.data && j.data.share);
+    sharesState = "idle";
+  }).catch(() => { sharesState = "error"; }).then(render);
+}
+function shareHtml(id){
+  const on = panel && panel.m === id ? panel.mode : "";
+  let h = '<div class="sharebox"><h3>코드 공유</h3><div class="row">' +
+    '<button type="button" class="btn' + (on === "form" ? " on" : "") + '" data-act="shareform" aria-expanded="' + (on === "form") + '">내 코드 공유하기</button>' +
+    '<button type="button" class="btn' + (on === "list" ? " on" : "") + '" data-act="sharelist" aria-expanded="' + (on === "list") + '">친구 코드 보기</button></div>';
+  if (on === "form"){
+    const d = drafts[id] || {note: "", code: ""};
+    h += '<form class="shareform" data-m="' + id + '" novalidate>' +
+      '<label>한 줄 설명<input name="note" maxlength="60" autocomplete="off" placeholder="예: 물 기준값을 0.3으로 바꿨어요" value="' + esc(d.note) + '"></label>' +
+      '<label>코드<textarea name="code" rows="10" spellcheck="false" placeholder="게임 코드 창의 코드를 복사해 붙여 넣으세요">' + esc(d.code) + "</textarea></label>" +
+      '<div class="row"><button type="submit" class="btn primary">공유하기</button></div></form>';
+  }
+  if (on === "list"){
+    const me = who(), list = (shares || []).filter(x => x.mission === id && !x.hidden);
+    h += '<div class="shares"><div class="bar"><span>' +
+      (sharesState === "loading" ? "불러오는 중..." : sharesState === "error" ? "불러오지 못했어요" : "친구 코드 " + list.length + "개") +
+      '</span><button type="button" class="btn" data-act="sharereload">새로 고침</button></div>';
+    if (sharesState !== "loading" && shares && !list.length) h += '<p>아직 공유된 코드가 없어요. 첫 번째로 공유해 보세요!</p>';
+    h += list.map(x => '<article class="share"><div class="shead"><b>' + esc(x.student) + "</b>" +
+      (x.note ? "<span>" + esc(x.note) + "</span>" : "") + "<small>" + ago(x.t) + "</small></div>" +
+      "<pre><code>" + esc(x.code) + '</code></pre><div class="row"><button type="button" class="btn" data-act="sharecopy" data-id="' + esc(x.id) + '">코드 복사</button>' +
+      (x.student === me ? '<button type="button" class="btn warn" data-act="unshare" data-id="' + esc(x.id) + '">내 공유 내리기</button>' : "") +
+      "</div></article>").join("") + "</div>";
+  }
+  return h + "</div>";
+}
+function copyText(text, btn, label){
+  const ok = () => { btn.textContent = "복사했어요"; setTimeout(() => { btn.textContent = label; }, 1500); };
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); ok(); } catch(err){ btn.textContent = "직접 선택해 복사하세요"; }
+    ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fallback);
+  else fallback();
+}
+
 let toastTimer = null;
 function toast(msg){
   const t = $("#toast"); t.textContent = msg; t.hidden = false;
@@ -184,7 +273,7 @@ function send(type, mission, value, extra, okMsg){
   if ((store.get("outbox") || []).length){
     queue(item); flush();
     toast("인터넷 연결을 기다리는 중이에요. 연결되면 자동으로 보낼게요");
-    return Promise.resolve(false);
+    return Promise.resolve("queued");
   }
   return post(item).then(() => {
     if (okMsg) toast(okMsg);
@@ -193,7 +282,7 @@ function send(type, mission, value, extra, okMsg){
     if (err.message === "rejected"){ toast("기록이 거절되었어요. 선생님께 알려 주세요"); return false; }
     queue(item);
     toast("인터넷이 잠시 끊겼어요. 기록을 보관했다가 연결되면 자동으로 보낼게요");
-    return false;
+    return "queued";
   });
 }
 function post(item){
@@ -307,7 +396,7 @@ function missionHtml(id){
     h += '<div class="mbody"><p>' + esc(m.need) + "</p><pre><code>" + esc(m.code) + "</code></pre>" +
       '<div class="row"><button type="button" class="btn" data-act="copy">코드 복사</button>' +
       '<button type="button" class="btn primary" data-act="done">' + (done ? "완료 취소" : "미션 완료") + "</button>" +
-      '<button type="button" class="btn warn" data-act="help">선생님, 도와주세요</button></div></div>';
+      '<button type="button" class="btn warn" data-act="help">선생님, 도와주세요</button></div>' + shareHtml(id) + "</div>";
   }
   return h + "</section>";
 }
@@ -361,18 +450,22 @@ $("#main").addEventListener("click", e => {
   const id = sec.dataset.m, act = e.target.closest("[data-act]");
   if (e.target.closest(".mhead")){ openMission = openMission === id ? null : id; render(); return; }
   if (!act) return;
-  if (act.dataset.act === "copy"){
-    const text = MISSIONS[id].code, btn = act;
-    const ok = () => { btn.textContent = "복사했어요"; setTimeout(() => { btn.textContent = "코드 복사"; }, 1500); };
-    const fallback = () => {
-      const ta = document.createElement("textarea");
-      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand("copy"); ok(); } catch(err){ btn.textContent = "직접 선택해 복사하세요"; }
-      ta.remove();
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fallback);
-    else fallback();
+  if (act.dataset.act === "copy") copyText(MISSIONS[id].code, act, "코드 복사");
+  if (act.dataset.act === "shareform" || act.dataset.act === "sharelist"){
+    const mode = act.dataset.act === "shareform" ? "form" : "list";
+    panel = panel && panel.m === id && panel.mode === mode ? null : {m: id, mode: mode};
+    if (panel && mode === "list") loadShares(); else render();
+    if (panel && mode === "form"){ const ta = $('.shareform[data-m="' + id + '"] textarea'); if (ta) ta.focus(); }
+  }
+  if (act.dataset.act === "sharereload") loadShares();
+  if (act.dataset.act === "sharecopy"){
+    const x = (shares || []).find(y => y.id === act.dataset.id);
+    if (x) copyText(x.code, act, "코드 복사");
+  }
+  if (act.dataset.act === "unshare"){
+    const x = (shares || []).find(y => y.id === act.dataset.id);
+    if (!x || !confirm("내 공유 코드를 내릴까요? 친구들 화면에서 사라집니다.")) return;
+    send("share", x.mission, "hide", {id: x.id}, "공유를 내렸어요").then(r => { if (r){ x.hidden = true; render(); } });
   }
   if (act.dataset.act === "help"){
     send("help", id, "open", null, "선생님께 도움 요청을 보냈어요");
@@ -424,7 +517,34 @@ whoBtn.addEventListener("click", () => {
 });
 sidInput.addEventListener("keydown", e => { if (e.key === "Enter" && !sidInput.readOnly) nameInput.focus(); });
 nameInput.addEventListener("keydown", e => { if (e.key === "Enter" && !nameInput.readOnly) saveWho(); });
+$("#main").addEventListener("input", e => {
+  const f = e.target.closest(".shareform");
+  if (!f) return;
+  drafts[f.dataset.m] = {note: f.elements.note.value, code: f.elements.code.value};
+});
+// 코드 창에서 Tab 키를 누르면 칸을 벗어나지 않고 스페이스 4칸을 넣음
+$("#main").addEventListener("keydown", e => {
+  if (e.key !== "Tab" || e.shiftKey || !e.target.matches(".shareform textarea")) return;
+  e.preventDefault();
+  e.target.setRangeText("    ", e.target.selectionStart, e.target.selectionEnd, "end");
+  e.target.dispatchEvent(new Event("input", {bubbles: true}));
+});
 $("#main").addEventListener("submit", e => {
+  const sf = e.target.closest(".shareform");
+  if (sf){
+    e.preventDefault();
+    const m = sf.dataset.m, note = sf.elements.note.value.trim(), code = sf.elements.code.value.replace(/\s+$/, "");
+    if (!code.trim()){ toast("공유할 코드를 붙여 넣으세요"); sf.elements.code.focus(); return; }
+    if (code.length > SHARE_MAX){ toast("코드가 너무 길어요 (" + SHARE_MAX + "자까지)"); sf.elements.code.focus(); return; }
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    send("share", m, "post", {id: id, note: note, code: code}, "코드를 공유했어요").then(r => {
+      if (!r) return;
+      delete drafts[m];
+      panel = {m: m, mode: "list"};
+      loadShares();
+    });
+    return;
+  }
   if (e.target.id !== "chForm") return;
   e.preventDefault();
   const f = new FormData(e.target), v = k => Number(f.get(k));
