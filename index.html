@@ -195,9 +195,19 @@ function ago(t){
   if (m < 60) return m + "분 전";
   return Math.floor(m / 60) + "시간 전";
 }
+// 스프레드시트가 미션 번호 "1-1"을 날짜(1월 1일)로 바꿔 저장한 예전 기록을 "1-1"로 되돌림
+function missionId(v){
+  const s = String(v == null ? "" : v);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(s)) return s;
+  const d = new Date(new Date(s).getTime() + 12 * 3600000);   // 시트 시간대와 상관없이 같은 날짜가 되도록 반나절 보정
+  return (d.getUTCMonth() + 1) + "-" + d.getUTCDate();
+}
+function cleanRows(rows){
+  return (rows || []).map(r => [r[0], String(r[1] == null ? "" : r[1]), missionId(r[2]), String(r[3] == null ? "" : r[3]), r[4]]);
+}
 function parseShares(rows){
   const map = {}, order = [];
-  (rows || []).forEach(r => {
+  cleanRows(rows).forEach(r => {
     let x; try { x = JSON.parse(r[4]); } catch(e){ return; }
     if (!x || !x.id) return;
     if (r[3] === "post"){
@@ -319,7 +329,7 @@ function restore(){
   return fetch(API + "?key=" + encodeURIComponent(KEY) + "&t=" + Date.now()).then(r => r.json()).then(j => {
     if (!j.ok || who() !== me) return;
     const server = {};
-    ((j.data && j.data.progress) || []).forEach(r => { if (String(r[1]) === me) server[r[2]] = r[3] === "done"; });
+    cleanRows(j.data && j.data.progress).forEach(r => { if (String(r[1]) === me) server[r[2]] = r[3] === "done"; });
     (store.get("outbox") || []).forEach(it => { if (it.type === "progress" && it.student === me) server[it.mission] = it.value === "done"; });
     let changed = 0;
     Object.keys(MISSIONS).forEach(m => {

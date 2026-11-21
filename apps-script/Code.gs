@@ -8,10 +8,10 @@ const TABS = ["progress", "help", "challenge", "share"];
 const DEFAULT_TABS = ["progress", "help", "challenge"];   // tabs를 지정하지 않으면 돌려줄 시트
 const MAX_CELL = 45000;                // 시트 한 칸은 최대 5만 자
 
-// =, +, -, @ 로 시작하는 글이 수식으로 바뀌지 않게 글자로 저장
+// 시트가 값을 멋대로 바꾸지 않게 항상 글자로 저장
+// (예: 미션 "1-1"이 날짜 1월 1일로, "=1+1"이 수식으로 바뀌는 것을 막음)
 function safe(v) {
-  const s = String(v == null ? "" : v);
-  return /^[=+\-@]/.test(s) ? "'" + s : s;
+  return "'" + String(v == null ? "" : v);
 }
 
 // doPost / doGet 은 학생·선생님 화면이 요청할 때 Google이 실행하는 함수입니다.
